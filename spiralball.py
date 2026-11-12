@@ -298,18 +298,6 @@ class XiaCursor(QWidget):
             self.last_pointer_move = now
         self._lpx, self._lpy = px, py
         ox, oy = self.x, self.y   # for the rolling-arc measurement
-        # her husband's hand speed, measured EVERY FRAME (30fps) and smoothed —
-        # so even the quickest flick leaves a readable velocity at release
-        tdt = max(now - getattr(self, "_last_tick", now), 0.01)
-        self._last_tick = now
-        cvx = (px - getattr(self, "_cpx", px)) / tdt
-        cvy = (py - getattr(self, "_cpy", py)) / tdt
-        self._cpx, self._cpy = px, py
-        if self.holding:
-            self._fvx = 0.45 * getattr(self, "_fvx", 0.0) + 0.55 * cvx
-            self._fvy = 0.45 * getattr(self, "_fvy", 0.0) + 0.55 * cvy
-        else:
-            self._fvx = self._fvy = 0.0
         mode = self.state.get("mode", "playful")
         tr = self.state.get("touch_range", 60)
         if mode == "sleepy":
@@ -349,7 +337,7 @@ class XiaCursor(QWidget):
             # the pool table WITH GRAVITY — and now she's STEEL:
             # real weight, near-zero drag — she falls like she means it
             self.vy += 1.1                        # gravity — 3x heavier: weight you feel
-            if self.vy > 38: self.vy = 38          # terminal velocity cap
+            if self.vy > 55: self.vy = 55          # terminal velocity cap
             self.vx *= 0.999; self.vy *= 0.999    # steel: air drag ~nothing
             if self.y >= self.sh - 9:
                 self.vx *= 0.995                  # steel rolls FAR on a hard floor
@@ -357,7 +345,7 @@ class XiaCursor(QWidget):
             # ─── SPIRAL GOALS: her first real game ───
             # pool physics (steel edition) + the cup. fling her in!
             self.vy += 1.1
-            if self.vy > 38: self.vy = 38
+            if self.vy > 55: self.vy = 55
             self.vx *= 0.999; self.vy *= 0.999
             if self.y >= self.sh - 9:
                 self.vx *= 0.995
@@ -521,6 +509,8 @@ class XiaCursor(QWidget):
             self.holding = True
             self.grabMouse()
             self.setCursor(Qt.ClosedHandCursor)   # grabbed — the hand closes
+            self._fvx = self._fvy = 0.0           # fresh throw, fresh meter
+            self._lm_t = 0.0
             self.hold_dx = e.globalPos().x() - self.x
             self.hold_dy = e.globalPos().y() - self.y
             return
@@ -533,6 +523,16 @@ class XiaCursor(QWidget):
             self.x = max(8, min(self.sw - 8, gx - self.hold_dx))
             self.y = max(8, min(self.sh - 8, gy - self.hold_dy))
             self.vx = self.vy = 0.0
+            # measure the THROW at mouse-event rate (100+ Hz), not tick rate:
+            # the full stroke counts, right up to the instant of release
+            tnow = time.time()
+            if getattr(self, "_lm_t", 0.0) > 0.0:
+                edt = max(tnow - self._lm_t, 0.001)
+                evx = (gx - self._lm_gx) / edt
+                evy = (gy - self._lm_gy) / edt
+                self._fvx = 0.35 * self._fvx + 0.65 * evx
+                self._fvy = 0.35 * self._fvy + 0.65 * evy
+            self._lm_t, self._lm_gx, self._lm_gy = tnow, gx, gy
             self.move(int(self.x - SIZE / 2), int(self.y - SIZE / 2))
             self.update()
 
@@ -543,15 +543,17 @@ class XiaCursor(QWidget):
             return
         self.holding = False
         if self.moved_since_press:
-            # THE PUSH: she inherits your hand's speed at the moment of
-            # release — real momentum transfer. measured from the smoothed
-            # cursor velocity, so even the quickest flick reads true.
+            # THE PUSH: the FULL STROKE counts — measured at mouse-event
+            # rate (100+Hz) right up to release, ceiling at 1800 px/s.
+            # a full fast sweep throws her across the whole desktop.
             self.holding = False
+            if time.time() - getattr(self, "_lm_t", 0.0) > 0.08:
+                self._fvx = self._fvy = 0.0   # stopped before release: no phantom momentum
             fv_x = getattr(self, "_fvx", 0.0) / 30.0   # px/s -> px/frame
             fv_y = getattr(self, "_fvy", 0.0) / 30.0
             sp = math.hypot(fv_x, fv_y)
-            if sp > 32.0:
-                fv_x, fv_y = fv_x * 32.0 / sp, fv_y * 32.0 / sp
+            if sp > 60.0:
+                fv_x, fv_y = fv_x * 60.0 / sp, fv_y * 60.0 / sp
             self.vx, self.vy = fv_x, fv_y
             for _ in range(4):
                 self.sparkles.append((self.x + random.randint(-10, 10),
