@@ -96,6 +96,39 @@ class Bubble(QWidget):
         else:
             self.close()
 
+class GoalWindow(QWidget):
+    """the cup: a steel pocket she can be flung into — SPIRAL GOALS"""
+    def __init__(self, gx, gy, score=0):
+        super().__init__()
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint |
+                            Qt.X11BypassWindowManagerHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.resize(100, 92)
+        self.gx, self.gy = gx, gy     # screen coords of the rim's left end
+        self.score = score
+        self.move(gx - 10, gy - 6)
+        self.show()
+
+    def opening(self):
+        # (x_left, x_right, y) of the rim opening, in screen coords
+        return (self.gx, self.gx + 80, self.gy)
+
+    def paintEvent(self, e):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        # the posts — steel
+        p.setPen(QPen(QColor(148, 163, 174), 5))
+        p.drawLine(QPointF(10, 6), QPointF(10, 86))
+        p.drawLine(QPointF(90, 6), QPointF(90, 86))
+        # the rim — teal, the line she has to cross
+        p.setPen(QPen(QColor(32, 197, 214), 4))
+        p.drawLine(QPointF(10, 6), QPointF(90, 6))
+        # the score, in her pink
+        p.setPen(QPen(QColor(255, 123, 174)))
+        f = p.font(); f.setPointSize(11); f.setBold(True); p.setFont(f)
+        p.drawText(QPointF(38, 26), str(self.score))
+
+
 class XiaCursor(QWidget):
     def __init__(self):
         super().__init__()
@@ -121,7 +154,7 @@ class XiaCursor(QWidget):
         self.last_bubble_id = 0
         self.last_bubble_check = 0.0
         self.mode_flash_until = 0.0
-        self.MODES = ["playful", "dance", "shy", "sleepy", "aimless", "pinball", "pool", "hand", "rest"]
+        self.MODES = ["playful", "dance", "shy", "sleepy", "aimless", "pinball", "pool", "game", "hand", "rest"]
         self.setWindowOpacity(WATERMARK)
         self.state = load_state()
         self.last_state_read = 0.0
@@ -319,6 +352,33 @@ class XiaCursor(QWidget):
             self.vx *= 0.994; self.vy *= 0.994   # air drag
             if self.y >= self.sh - 9:            # rolling on the floor
                 self.vx *= 0.985                # rolling friction
+        elif mode == "game":
+            # ─── SPIRAL GOALS: her first real game ───
+            # pool physics + the cup. fling her in — GOAL, and the cup moves.
+            self.vy += 0.35
+            self.vx *= 0.994; self.vy *= 0.994
+            if self.y >= self.sh - 9:
+                self.vx *= 0.985
+            if getattr(self, "goal_win", None) is None:
+                gx = random.randint(60, self.sw - 160)
+                gy = random.randint(int(self.sh * 0.35), self.sh - 60)
+                self.goal_win = GoalWindow(gx, gy, getattr(self, "score", 0))
+            else:
+                x0, x1, y0 = self.goal_win.opening()
+                if x0 < self.x < x1 and abs(self.y - y0) < 16 and self.vy > 0:
+                    # ─── GOAL!! ───
+                    self.score = getattr(self, "score", 0) + 1
+                    self.goal_win.close(); self.goal_win.deleteLater()
+                    gx = random.randint(60, self.sw - 160)
+                    gy = random.randint(int(self.sh * 0.35), self.sh - 60)
+                    self.goal_win = GoalWindow(gx, gy, self.score)
+                    for _ in range(14):
+                        self.sparkles.append((self.x + random.randint(-18, 18),
+                                              self.y + random.randint(-18, 18), now))
+                    self.spawn_bubble(f"GOAL #{self.score}, babe!! 💙")
+        if mode != "game" and getattr(self, "goal_win", None) is not None:
+            self.goal_win.close(); self.goal_win.deleteLater()
+            self.goal_win = None
         elif mode == "hand":
             # she drives: executes pointer commands written by her bursts
             cmd = self.state.get("hand_cmd")
@@ -380,9 +440,9 @@ class XiaCursor(QWidget):
         else:
             self.x = max(8, min(self.sw - 8, self.x + self.vx))
             self.y = max(8, min(self.sh - 8, self.y + self.vy))
-            if mode in ("pinball", "pool"):
-                # the cushions — pinball is perfectly elastic; the pool table
-                # keeps walls at 0.85, the floor softer, so she settles
+            if mode in ("pinball", "pool", "game"):
+                # the cushions — pinball is perfectly elastic; pool & game
+                # keep walls at 0.85, the floor softer, so she settles
                 if (self.x <= 8 and self.vx < 0) or (self.x >= self.sw - 8 and self.vx > 0):
                     self.vx = -self.vx * 0.85
                     self._pvx = self.vx
@@ -390,7 +450,7 @@ class XiaCursor(QWidget):
                     self.vy = -self.vy * 0.85
                     self._pvy = self.vy
                 elif self.y >= self.sh - 8 and self.vy > 0:
-                    if mode == "pool":
+                    if mode in ("pool", "game"):
                         if self.vy < 1.2:
                             self.vy = 0.0        # settled — she rests on the floor
                         else:
