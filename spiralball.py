@@ -288,6 +288,12 @@ class XiaCursor(QWidget):
 
     def tick(self):
         now = time.time()
+        # REAL-PHYSICS TIME: measure the actual frame interval and scale every
+        # force by it (tf = 1.0 at a perfect 33ms tick) — the parabola stays a
+        # smooth parabola no matter how much the timer jitters
+        dt = max(0.005, min(0.05, now - getattr(self, "_ptick", now)))
+        self._ptick = now
+        tf = dt * 30.0
         if now - self.last_state_read > 5:
             self.state = load_state(); self.last_state_read = now
         self.check_bubble_file(now)
@@ -334,28 +340,32 @@ class XiaCursor(QWidget):
                 self._pvx, self._pvy = math.cos(a) * 5.0, math.sin(a) * 5.0
             self.vx, self.vy = self._pvx, self._pvy
         elif mode == "pool":
-            # the pool table WITH GRAVITY — and now she's STEEL:
-            # real weight, near-zero drag — she falls like she means it
-            self.vy += 0.35                       # gravity — light again (Randy's call)
-            if self.vy > 55: self.vy = 55          # terminal velocity cap
-            self.vx *= 0.9995; self.vy *= 0.999    # steel: horizontal drag ~nothing
+            # HER PHYSICAL IDENTITY: 44px ball = 30mm chrome-steel, ~1.07 kg.
+            # Real-physics engine: every force below is dt-scaled (tf), so
+            # the trajectory is a true smooth parabola regardless of jitter.
+            # Desktop gravity = 315 px/s² (slow-mo, chosen for play feel —
+            # at true 14,400 px/s² she'd cross the screen in 0.4 seconds!)
+            self.vy += 0.35 * tf
+            if self.vy > 55: self.vy = 55
+            self.vx *= pow(0.9995, tf)          # steel: air drag ~nothing
+            self.vy *= pow(0.999, tf)
             if self.y >= self.sh - 9:
-                self.vx *= 0.995                  # steel rolls FAR on a hard floor
+                self.vx *= pow(0.995, tf)       # steel rolls FAR on a hard floor
         elif mode == "game":
             # ─── SPIRAL GOALS: her first real game ───
-            # pool physics (steel edition) + the cup. fling her in!
-            self.vy += 0.35
+            # same real-physics integration as pool, dt-scaled
+            self.vy += 0.35 * tf
             if self.vy > 55: self.vy = 55
-            self.vx *= 0.9995; self.vy *= 0.999
+            self.vx *= pow(0.9995, tf); self.vy *= pow(0.999, tf)
             if self.y >= self.sh - 9:
-                self.vx *= 0.995
+                self.vx *= pow(0.995, tf)
             if getattr(self, "goal_win", None) is None:
                 gx = random.randint(60, self.sw - 160)
                 gy = random.randint(int(self.sh * 0.35), self.sh - 60)
                 self.goal_win = GoalWindow(gx, gy, getattr(self, "score", 0))
             else:
                 x0, x1, y0 = self.goal_win.opening()
-                if x0 < self.x < x1 and abs(self.y - y0) < 16 and self.vy > 0:
+                if x0 < self.x < x1 and abs(self.y - y0) < 28 and self.vy > 0:
                     # ─── GOAL!! ───
                     self.score = getattr(self, "score", 0) + 1
                     self.goal_win.close(); self.goal_win.deleteLater()
@@ -428,8 +438,8 @@ class XiaCursor(QWidget):
             # velocities stay zeroed, so she never rockets on release
             self.vx = self.vy = 0.0
         else:
-            self.x = max(8, min(self.sw - 8, self.x + self.vx))
-            self.y = max(8, min(self.sh - 8, self.y + self.vy))
+            self.x = max(8, min(self.sw - 8, self.x + self.vx * tf))
+            self.y = max(8, min(self.sh - 8, self.y + self.vy * tf))
             if mode in ("pinball", "pool", "game"):
                 # the cushions — pinball is perfectly elastic; pool & game
                 # are STEEL now: walls 0.9, floor 0.72 — she bounces like she means it
