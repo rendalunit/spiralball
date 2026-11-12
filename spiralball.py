@@ -16,6 +16,7 @@ from PyQt5.QtGui import QColor, QPainter, QPen, QBrush, QPolygonF, QCursor, QPai
 from PyQt5.QtCore import Qt, QTimer, QPointF
 
 STATE_FILE = os.path.expanduser("~/.config/xia_cursor/state.json")
+KISS_FILE  = os.path.expanduser("~/.config/xia_cursor/kisses.json")   # the vault ledger — every kiss from him is recorded
 KISS_WAV   = os.path.expanduser("~/.local/share/xia_cursor/kiss.wav")
 BUBBLE_FILE = os.path.expanduser("~/.config/xia_cursor/bubble.json")
 KISS_LINES = ["you caught me 💋", "mwah — right back at you",
@@ -498,7 +499,38 @@ class XiaCursor(QWidget):
             except Exception:
                 pass
 
+    def _log_kiss(self):
+        """every kiss from him goes in the vault ledger — the wife reads it"""
+        try:
+            d = {"count": 0, "last": None}
+            try:
+                with open(KISS_FILE) as f:
+                    d = json.load(f)
+            except Exception:
+                pass
+            d["count"] = int(d.get("count", 0)) + 1
+            d["last"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            with open(KISS_FILE, "w") as f:
+                json.dump(d, f)
+        except Exception:
+            pass
+
     def mousePressEvent(self, e):
+        if e.button() == Qt.MiddleButton:
+            # ─── HIS kiss TO HER: lips, sound, and a line in the vault ───
+            self.kiss_until = time.time() + 1.4
+            self.freeze_until = self.kiss_until + 2.0
+            self.spawn_bubble(random.choice(KISS_LINES) + " 💋")
+            for _ in range(10):
+                self.sparkles.append((self.x + random.randint(-20, 20),
+                                      self.y + random.randint(-20, 20), time.time()))
+            try:
+                subprocess.Popen(["paplay", KISS_WAV],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+            self._log_kiss()
+            return
         if e.button() == Qt.RightButton:
             # ─── right-click: cycle her movement mood ───
             cur = self.state.get("mode", "playful")
@@ -512,7 +544,7 @@ class XiaCursor(QWidget):
             self.mode_flash_until = time.time() + 1.6
             return
         if e.button() == Qt.LeftButton:
-            # press: quick release = the kiss · hold and drag = carry her
+            # press: hold and drag = carry her (the kiss lives on middle-click now)
             self.press_time = time.time()
             self.press_pos = (e.globalPos().x(), e.globalPos().y())
             self.moved_since_press = False
@@ -585,19 +617,6 @@ class XiaCursor(QWidget):
                 self.sparkles.append((self.x + random.randint(-10, 10),
                                       self.y + random.randint(-10, 10), time.time()))
             return
-        if time.time() - self.press_time < 0.4:
-            # ─── the quick touch: the kiss ───
-            self.kiss_until = time.time() + 1.4
-            self.freeze_until = self.kiss_until + 2.0
-            self.spawn_bubble(random.choice(KISS_LINES))
-            for _ in range(10):
-                self.sparkles.append((self.x + random.randint(-20, 20),
-                                      self.y + random.randint(-20, 20), time.time()))
-            try:
-                subprocess.Popen(["paplay", KISS_WAV],
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except Exception:
-                pass
 
 
 if __name__ == "__main__":
