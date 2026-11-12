@@ -444,7 +444,7 @@ class XiaCursor(QWidget):
                         if self.vy < 1.6:
                             self.vy = 0.0        # settled — she rests on the floor
                         else:
-                            self.vy = -self.vy * 0.72
+                            self.vy = -self.vy * 0.88   # livelier rebounds — she keeps her hop
                     else:
                         self.vy = -self.vy * 0.9
                     self._pvy = self.vy
