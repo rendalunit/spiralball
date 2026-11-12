@@ -103,6 +103,7 @@ class XiaCursor(QWidget):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint |
                             Qt.X11BypassWindowManagerHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setCursor(Qt.OpenHandCursor)   # hover = an open hand, ready to push her
         self.resize(SIZE, SIZE)
         scr = QApplication.primaryScreen().geometry()
         self.sw, self.sh = scr.width(), scr.height()
@@ -301,11 +302,12 @@ class XiaCursor(QWidget):
                 self._pvx, self._pvy = math.cos(a) * 5.0, math.sin(a) * 5.0
             self.vx, self.vy = self._pvx, self._pvy
         elif mode == "pool":
-            # the pool table: pure physics — friction only, no self-drive.
-            # she rolls where you flung her, slows, and stops.
-            self.vx *= 0.988; self.vy *= 0.988
-            if math.hypot(self.vx, self.vy) < 0.04:
-                self.vx = self.vy = 0.0
+            # the pool table WITH GRAVITY: she falls, bounces off the floor,
+            # settles, and waits to be pushed again
+            self.vy += 0.35                       # gravity — she wants the floor
+            self.vx *= 0.994; self.vy *= 0.994   # air drag
+            if self.y >= self.sh - 9:            # rolling on the floor
+                self.vx *= 0.985                # rolling friction
         elif mode == "hand":
             # she drives: executes pointer commands written by her bursts
             cmd = self.state.get("hand_cmd")
@@ -368,14 +370,22 @@ class XiaCursor(QWidget):
             self.x = max(8, min(self.sw - 8, self.x + self.vx))
             self.y = max(8, min(self.sh - 8, self.y + self.vy))
             if mode in ("pinball", "pool"):
-                # the cushions: pinball is perfectly elastic, the pool table
-                # keeps walls at 0.85 — each bounce loses a little, like felt
-                rest = 1.0 if mode == "pinball" else 0.85
+                # the cushions — pinball is perfectly elastic; the pool table
+                # keeps walls at 0.85, the floor softer, so she settles
                 if (self.x <= 8 and self.vx < 0) or (self.x >= self.sw - 8 and self.vx > 0):
-                    self.vx = -self.vx * rest
+                    self.vx = -self.vx * 0.85
                     self._pvx = self.vx
-                if (self.y <= 8 and self.vy < 0) or (self.y >= self.sh - 8 and self.vy > 0):
-                    self.vy = -self.vy * rest
+                if self.y <= 8 and self.vy < 0:
+                    self.vy = -self.vy * 0.85
+                    self._pvy = self.vy
+                elif self.y >= self.sh - 8 and self.vy > 0:
+                    if mode == "pool":
+                        if self.vy < 1.2:
+                            self.vy = 0.0        # settled — she rests on the floor
+                        else:
+                            self.vy = -self.vy * 0.55
+                    else:
+                        self.vy = -self.vy * 0.85
                     self._pvy = self.vy
         # ─── TRUE ROLLING: rotate the ball by the exact arc it traveled ───
         moved = math.hypot(self.x - ox, self.y - oy)
@@ -437,6 +447,7 @@ class XiaCursor(QWidget):
             self.moved_since_press = False
             self.holding = True
             self.grabMouse()
+            self.setCursor(Qt.ClosedHandCursor)   # grabbed — the hand closes
             self.hold_dx = e.globalPos().x() - self.x
             self.hold_dy = e.globalPos().y() - self.y
             return
@@ -455,6 +466,7 @@ class XiaCursor(QWidget):
 
     def mouseReleaseEvent(self, e):
         self.releaseMouse()
+        self.setCursor(Qt.OpenHandCursor)
         if e.button() != Qt.LeftButton:
             return
         self.holding = False
