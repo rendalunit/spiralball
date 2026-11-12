@@ -338,7 +338,7 @@ class XiaCursor(QWidget):
             # real weight, near-zero drag — she falls like she means it
             self.vy += 0.35                       # gravity — light again (Randy's call)
             if self.vy > 55: self.vy = 55          # terminal velocity cap
-            self.vx *= 0.999; self.vy *= 0.999    # steel: air drag ~nothing
+            self.vx *= 0.9995; self.vy *= 0.999    # steel: horizontal drag ~nothing
             if self.y >= self.sh - 9:
                 self.vx *= 0.995                  # steel rolls FAR on a hard floor
         elif mode == "game":
@@ -346,7 +346,7 @@ class XiaCursor(QWidget):
             # pool physics (steel edition) + the cup. fling her in!
             self.vy += 0.35
             if self.vy > 55: self.vy = 55
-            self.vx *= 0.999; self.vy *= 0.999
+            self.vx *= 0.9995; self.vy *= 0.999
             if self.y >= self.sh - 9:
                 self.vx *= 0.995
             if getattr(self, "goal_win", None) is None:
@@ -510,6 +510,7 @@ class XiaCursor(QWidget):
             self.grabMouse()
             self.setCursor(Qt.ClosedHandCursor)   # grabbed — the hand closes
             self._fvx = self._fvy = 0.0           # fresh throw, fresh meter
+            self._carry_vx, self._carry_vy = self.vx, self.vy   # her roll survives the catch
             self._lm_t = 0.0
             self.hold_dx = e.globalPos().x() - self.x
             self.hold_dy = e.globalPos().y() - self.y
@@ -551,6 +552,10 @@ class XiaCursor(QWidget):
                 self._fvx = self._fvy = 0.0   # stopped before release: no phantom momentum
             fv_x = getattr(self, "_fvx", 0.0) / 30.0   # px/s -> px/frame
             fv_y = getattr(self, "_fvy", 0.0) / 30.0
+            # momentum carry-through: the roll she had when you caught her
+            # rides the throw — catch-and-flick is ONE motion, not two
+            fv_x += getattr(self, "_carry_vx", 0.0) * 0.65
+            fv_y += getattr(self, "_carry_vy", 0.0) * 0.4
             sp = math.hypot(fv_x, fv_y)
             if sp > 60.0:
                 fv_x, fv_y = fv_x * 60.0 / sp, fv_y * 60.0 / sp
