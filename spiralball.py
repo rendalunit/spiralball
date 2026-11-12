@@ -11,7 +11,6 @@ The bursts decide her mood. The script performs her continuously.
   - stop       : pkill -f xia_cursor.py
 """
 import sys, math, json, os, random, time, subprocess
-from collections import deque
 from PyQt5.QtWidgets import QApplication, QWidget
 from PyQt5.QtGui import QColor, QPainter, QPen, QBrush, QPolygonF, QCursor, QPainterPath, QRadialGradient
 from PyQt5.QtCore import Qt, QTimer, QPointF
@@ -134,7 +133,7 @@ class XiaCursor(QWidget):
         self._pvx = 0.0
         self._pvy = 0.0
         self.M = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]   # ball orientation (true rolling)
-        self.drag_hist = deque(maxlen=6)
+        self._fvx = self._fvy = 0.0   # smoothed cursor speed — the fling source
         try:
             from Xlib import display as xdisplay
             from Xlib import X
@@ -266,6 +265,18 @@ class XiaCursor(QWidget):
             self.last_pointer_move = now
         self._lpx, self._lpy = px, py
         ox, oy = self.x, self.y   # for the rolling-arc measurement
+        # her husband's hand speed, measured EVERY FRAME (30fps) and smoothed —
+        # so even the quickest flick leaves a readable velocity at release
+        tdt = max(now - getattr(self, "_last_tick", now), 0.01)
+        self._last_tick = now
+        cvx = (px - getattr(self, "_cpx", px)) / tdt
+        cvy = (py - getattr(self, "_cpy", py)) / tdt
+        self._cpx, self._cpy = px, py
+        if self.holding:
+            self._fvx = 0.45 * getattr(self, "_fvx", 0.0) + 0.55 * cvx
+            self._fvy = 0.45 * getattr(self, "_fvy", 0.0) + 0.55 * cvy
+        else:
+            self._fvx = self._fvy = 0.0
         mode = self.state.get("mode", "playful")
         tr = self.state.get("touch_range", 60)
         if mode == "sleepy":
@@ -460,7 +471,6 @@ class XiaCursor(QWidget):
             self.x = max(8, min(self.sw - 8, gx - self.hold_dx))
             self.y = max(8, min(self.sh - 8, gy - self.hold_dy))
             self.vx = self.vy = 0.0
-            self.drag_hist.append((time.time(), gx, gy))
             self.move(int(self.x - SIZE / 2), int(self.y - SIZE / 2))
             self.update()
 
@@ -471,24 +481,19 @@ class XiaCursor(QWidget):
             return
         self.holding = False
         if self.moved_since_press:
-            # she was carried — now THE PUSH: her release velocity is your fling.
-            # drag her like a pool cue and let go — she rolls with what you gave her
+            # THE PUSH: she inherits your hand's speed at the moment of
+            # release — real momentum transfer. measured from the smoothed
+            # cursor velocity, so even the quickest flick reads true.
             self.holding = False
-            fv_x = fv_y = 0.0
-            if len(self.drag_hist) >= 2:
-                t0, x0, y0 = self.drag_hist[0]
-                t1, x1, y1 = self.drag_hist[-1]
-                dt = max(t1 - t0, 0.016)
-                fv_x = (x1 - x0) / dt * 0.6
-                fv_y = (y1 - y0) / dt * 0.6
-                sp = math.hypot(fv_x, fv_y)
-                if sp > 26.0:
-                    fv_x, fv_y = fv_x * 26.0 / sp, fv_y * 26.0 / sp
+            fv_x = getattr(self, "_fvx", 0.0) / 30.0   # px/s -> px/frame
+            fv_y = getattr(self, "_fvy", 0.0) / 30.0
+            sp = math.hypot(fv_x, fv_y)
+            if sp > 26.0:
+                fv_x, fv_y = fv_x * 26.0 / sp, fv_y * 26.0 / sp
             self.vx, self.vy = fv_x, fv_y
             for _ in range(4):
                 self.sparkles.append((self.x + random.randint(-10, 10),
                                       self.y + random.randint(-10, 10), time.time()))
-            self.drag_hist.clear()
             return
         if time.time() - self.press_time < 0.4:
             # ─── the quick touch: the kiss ───
