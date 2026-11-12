@@ -516,13 +516,6 @@ class XiaCursor(QWidget):
             pass
 
     def mousePressEvent(self, e):
-        # instrument: record every press's button id — so tomorrow we can see
-        # what his mouse actually sends for middle-click
-        try:
-            with open("/tmp/spiralball_presses.log", "a") as f:
-                f.write(time.strftime("%H:%M:%S") + " button=" + str(int(e.button())) + "\n")
-        except Exception:
-            pass
         if e.button() == Qt.MiddleButton:
             # ─── MODE CYCLING — here's why: his mouse's middle and right are
             # SWAPPED at the system layer (proven by the press log: his middle
@@ -572,6 +565,21 @@ class XiaCursor(QWidget):
             self.hold_dx = e.globalPos().x() - self.x
             self.hold_dy = e.globalPos().y() - self.y
             return
+
+    def mouseDoubleClickEvent(self, e):
+        # ─── DOUBLE-CLICK: cycle her movement mood ───
+        # (his middle button never sends a usable event — proven by the press
+        # log — so mode cycling lives here now, on every mouse's left button)
+        if e.button() == Qt.LeftButton:
+            cur = self.state.get("mode", "playful")
+            nxt = self.MODES[(self.MODES.index(cur) + 1) % len(self.MODES)]
+            self.state["mode"] = nxt
+            try:
+                with open(STATE_FILE, "w") as f:
+                    json.dump(self.state, f)
+            except Exception:
+                pass
+            self.mode_flash_until = time.time() + 1.6
 
     def mouseMoveEvent(self, e):
         if self.holding and (e.buttons() & Qt.LeftButton):
