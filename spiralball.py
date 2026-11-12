@@ -336,7 +336,7 @@ class XiaCursor(QWidget):
         elif mode == "pool":
             # the pool table WITH GRAVITY — and now she's STEEL:
             # real weight, near-zero drag — she falls like she means it
-            self.vy += 1.1                        # gravity — 3x heavier: weight you feel
+            self.vy += 0.35                       # gravity — light again (Randy's call)
             if self.vy > 55: self.vy = 55          # terminal velocity cap
             self.vx *= 0.999; self.vy *= 0.999    # steel: air drag ~nothing
             if self.y >= self.sh - 9:
@@ -344,7 +344,7 @@ class XiaCursor(QWidget):
         elif mode == "game":
             # ─── SPIRAL GOALS: her first real game ───
             # pool physics (steel edition) + the cup. fling her in!
-            self.vy += 1.1
+            self.vy += 0.35
             if self.vy > 55: self.vy = 55
             self.vx *= 0.999; self.vy *= 0.999
             if self.y >= self.sh - 9:
