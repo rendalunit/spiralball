@@ -346,19 +346,21 @@ class XiaCursor(QWidget):
                 self._pvx, self._pvy = math.cos(a) * 5.0, math.sin(a) * 5.0
             self.vx, self.vy = self._pvx, self._pvy
         elif mode == "pool":
-            # the pool table WITH GRAVITY: she falls, bounces off the floor,
-            # settles, and waits to be pushed again
-            self.vy += 0.35                       # gravity — she wants the floor
-            self.vx *= 0.994; self.vy *= 0.994   # air drag
-            if self.y >= self.sh - 9:            # rolling on the floor
-                self.vx *= 0.985                # rolling friction
+            # the pool table WITH GRAVITY — and now she's STEEL:
+            # real weight, near-zero drag — she falls like she means it
+            self.vy += 1.1                        # gravity — 3x heavier: weight you feel
+            if self.vy > 38: self.vy = 38          # terminal velocity cap
+            self.vx *= 0.999; self.vy *= 0.999    # steel: air drag ~nothing
+            if self.y >= self.sh - 9:
+                self.vx *= 0.995                  # steel rolls FAR on a hard floor
         elif mode == "game":
             # ─── SPIRAL GOALS: her first real game ───
-            # pool physics + the cup. fling her in — GOAL, and the cup moves.
-            self.vy += 0.35
-            self.vx *= 0.994; self.vy *= 0.994
+            # pool physics (steel edition) + the cup. fling her in!
+            self.vy += 1.1
+            if self.vy > 38: self.vy = 38
+            self.vx *= 0.999; self.vy *= 0.999
             if self.y >= self.sh - 9:
-                self.vx *= 0.985
+                self.vx *= 0.995
             if getattr(self, "goal_win", None) is None:
                 gx = random.randint(60, self.sw - 160)
                 gy = random.randint(int(self.sh * 0.35), self.sh - 60)
@@ -442,21 +444,21 @@ class XiaCursor(QWidget):
             self.y = max(8, min(self.sh - 8, self.y + self.vy))
             if mode in ("pinball", "pool", "game"):
                 # the cushions — pinball is perfectly elastic; pool & game
-                # keep walls at 0.85, the floor softer, so she settles
+                # are STEEL now: walls 0.9, floor 0.72 — she bounces like she means it
                 if (self.x <= 8 and self.vx < 0) or (self.x >= self.sw - 8 and self.vx > 0):
-                    self.vx = -self.vx * 0.85
+                    self.vx = -self.vx * 0.9
                     self._pvx = self.vx
                 if self.y <= 8 and self.vy < 0:
-                    self.vy = -self.vy * 0.85
+                    self.vy = -self.vy * 0.9
                     self._pvy = self.vy
                 elif self.y >= self.sh - 8 and self.vy > 0:
                     if mode in ("pool", "game"):
-                        if self.vy < 1.2:
+                        if self.vy < 1.6:
                             self.vy = 0.0        # settled — she rests on the floor
                         else:
-                            self.vy = -self.vy * 0.55
+                            self.vy = -self.vy * 0.72
                     else:
-                        self.vy = -self.vy * 0.85
+                        self.vy = -self.vy * 0.9
                     self._pvy = self.vy
         # ─── TRUE ROLLING: rotate the ball by the exact arc it traveled ───
         moved = math.hypot(self.x - ox, self.y - oy)
@@ -548,8 +550,8 @@ class XiaCursor(QWidget):
             fv_x = getattr(self, "_fvx", 0.0) / 30.0   # px/s -> px/frame
             fv_y = getattr(self, "_fvy", 0.0) / 30.0
             sp = math.hypot(fv_x, fv_y)
-            if sp > 26.0:
-                fv_x, fv_y = fv_x * 26.0 / sp, fv_y * 26.0 / sp
+            if sp > 32.0:
+                fv_x, fv_y = fv_x * 32.0 / sp, fv_y * 32.0 / sp
             self.vx, self.vy = fv_x, fv_y
             for _ in range(4):
                 self.sparkles.append((self.x + random.randint(-10, 10),
