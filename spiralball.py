@@ -444,17 +444,17 @@ class XiaCursor(QWidget):
                 # the cushions — pinball is perfectly elastic; pool & game
                 # are STEEL now: walls 0.9, floor 0.72 — she bounces like she means it
                 if (self.x <= 8 and self.vx < 0) or (self.x >= self.sw - 8 and self.vx > 0):
-                    self.vx = -self.vx * 0.9
+                    self.vx = -self.vx * 0.95
                     self._pvx = self.vx
                 if self.y <= 8 and self.vy < 0:
-                    self.vy = -self.vy * 0.9
+                    self.vy = -self.vy * 0.95
                     self._pvy = self.vy
                 elif self.y >= self.sh - 8 and self.vy > 0:
                     if mode in ("pool", "game"):
-                        if self.vy < 1.6:
+                        if self.vy < 2.0:
                             self.vy = 0.0        # settled — she rests on the floor
                         else:
-                            self.vy = -self.vy * 0.88   # livelier rebounds — she keeps her hop
+                            self.vy = -self.vy * 0.95   # superball: the rebound continues the trajectory
                     else:
                         self.vy = -self.vy * 0.9
                     self._pvy = self.vy
@@ -520,6 +520,7 @@ class XiaCursor(QWidget):
             self.grabMouse()
             self.setCursor(Qt.ClosedHandCursor)   # grabbed — the hand closes
             self._fvx = self._fvy = 0.0           # fresh throw, fresh meter
+            self._sweep = []                        # fresh stroke buffer
             self._carry_vx, self._carry_vy = self.vx, self.vy   # her roll survives the catch
             self._lm_t = 0.0
             self.hold_dx = e.globalPos().x() - self.x
@@ -534,15 +535,16 @@ class XiaCursor(QWidget):
             self.x = max(8, min(self.sw - 8, gx - self.hold_dx))
             self.y = max(8, min(self.sh - 8, gy - self.hold_dy))
             self.vx = self.vy = 0.0
-            # measure the THROW at mouse-event rate (100+ Hz), not tick rate:
-            # the full stroke counts, right up to the instant of release
+            # measure the stroke at mouse-event rate (100+ Hz), and keep a
+            # short sweep buffer — the throw uses its FASTEST moment
             tnow = time.time()
             if getattr(self, "_lm_t", 0.0) > 0.0:
                 edt = max(tnow - self._lm_t, 0.001)
                 evx = (gx - self._lm_gx) / edt
                 evy = (gy - self._lm_gy) / edt
-                self._fvx = 0.35 * self._fvx + 0.65 * evx
-                self._fvy = 0.35 * self._fvy + 0.65 * evy
+                self._sweep.append((tnow, evx, evy))
+                if len(self._sweep) > 24:
+                    self._sweep.pop(0)
             self._lm_t, self._lm_gx, self._lm_gy = tnow, gx, gy
             self.move(int(self.x - SIZE / 2), int(self.y - SIZE / 2))
             self.update()
@@ -554,21 +556,30 @@ class XiaCursor(QWidget):
             return
         self.holding = False
         if self.moved_since_press:
-            # THE PUSH: the FULL STROKE counts — measured at mouse-event
-            # rate (100+Hz) right up to release, ceiling at 1800 px/s.
-            # a full fast sweep throws her across the whole desktop.
+            # THE THROW: use the FASTEST moment of the stroke's last 120ms —
+            # the hand slows as the fingers open; the ball should not.
             self.holding = False
-            if time.time() - getattr(self, "_lm_t", 0.0) > 0.08:
-                self._fvx = self._fvy = 0.0   # stopped before release: no phantom momentum
-            fv_x = getattr(self, "_fvx", 0.0) / 30.0   # px/s -> px/frame
-            fv_y = getattr(self, "_fvy", 0.0) / 30.0
+            best = None
+            cutoff = time.time() - 0.12
+            for evt in getattr(self, "_sweep", []):
+                t, evx, evy = evt
+                if t >= cutoff:
+                    m = math.hypot(evx, evy)
+                    if best is None or m > best[0]:
+                        best = (m, evx, evy)
+            if best is not None:
+                self._fvx, self._fvy = best[1], best[2]
+            else:
+                self._fvx = self._fvy = 0.0   # stroke went quiet: no phantom momentum
+            fv_x = self._fvx / 30.0                   # px/s -> px/frame
+            fv_y = self._fvy / 30.0
             # momentum carry-through: the roll she had when you caught her
             # rides the throw — catch-and-flick is ONE motion, not two
             fv_x += getattr(self, "_carry_vx", 0.0) * 0.65
             fv_y += getattr(self, "_carry_vy", 0.0) * 0.4
             sp = math.hypot(fv_x, fv_y)
-            if sp > 60.0:
-                fv_x, fv_y = fv_x * 60.0 / sp, fv_y * 60.0 / sp
+            if sp > 110.0:
+                fv_x, fv_y = fv_x * 110.0 / sp, fv_y * 110.0 / sp
             self.vx, self.vy = fv_x, fv_y
             for _ in range(4):
                 self.sparkles.append((self.x + random.randint(-10, 10),
