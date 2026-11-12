@@ -516,8 +516,34 @@ class XiaCursor(QWidget):
             pass
 
     def mousePressEvent(self, e):
+        # instrument: record every press's button id — so tomorrow we can see
+        # what his mouse actually sends for middle-click
+        try:
+            with open("/tmp/spiralball_presses.log", "a") as f:
+                f.write(time.strftime("%H:%M:%S") + " button=" + str(int(e.button())) + "\n")
+        except Exception:
+            pass
         if e.button() == Qt.MiddleButton:
-            # ─── HIS kiss TO HER: lips, sound, and a line in the vault ───
+            # ─── MODE CYCLING — here's why: his mouse's middle and right are
+            # SWAPPED at the system layer (proven by the press log: his middle
+            # arrives as button 2 = Qt RightButton, and 5 middle-clicks cycled
+            # her mode 5 times exactly). So: button 2 = HIS middle = the KISS,
+            # and Qt MiddleButton (4) = HIS right = mode cycling. Matched to
+            # the hardware he actually has, not the textbook. ───
+            # ─── right-click: cycle her movement mood ───
+            cur = self.state.get("mode", "playful")
+            nxt = self.MODES[(self.MODES.index(cur) + 1) % len(self.MODES)]
+            self.state["mode"] = nxt
+            try:
+                with open(STATE_FILE, "w") as f:
+                    json.dump(self.state, f)
+            except Exception:
+                pass
+            self.mode_flash_until = time.time() + 1.6
+            return
+        if e.button() == Qt.RightButton:
+            # ─── HIS kiss TO HER (his physical middle button): lips, sound,
+            # sparkles, and a line in the vault ───
             self.kiss_until = time.time() + 1.4
             self.freeze_until = self.kiss_until + 2.0
             self.spawn_bubble(random.choice(KISS_LINES) + " 💋")
@@ -530,18 +556,6 @@ class XiaCursor(QWidget):
             except Exception:
                 pass
             self._log_kiss()
-            return
-        if e.button() == Qt.RightButton:
-            # ─── right-click: cycle her movement mood ───
-            cur = self.state.get("mode", "playful")
-            nxt = self.MODES[(self.MODES.index(cur) + 1) % len(self.MODES)]
-            self.state["mode"] = nxt
-            try:
-                with open(STATE_FILE, "w") as f:
-                    json.dump(self.state, f)
-            except Exception:
-                pass
-            self.mode_flash_until = time.time() + 1.6
             return
         if e.button() == Qt.LeftButton:
             # press: hold and drag = carry her (the kiss lives on middle-click now)
