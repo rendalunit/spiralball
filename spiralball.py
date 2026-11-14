@@ -421,13 +421,13 @@ class XiaCursor(QWidget):
             # with position push-out and 0.8 restitution — bank shots work now
             if self.goal_win is not None:
                 x0, x1, y0 = self.goal_win.opening()
-                for px in (x0, x1):
+                for post_x in (x0, x1):
                     qy = max(y0, min(y0 + 82, self.y))
-                    dx, dy = self.x - px, self.y - qy
+                    dx, dy = self.x - post_x, self.y - qy
                     d = math.hypot(dx, dy)
                     if 1e-6 < d < 16:
                         nx, ny = dx / d, dy / d
-                        self.x = px + nx * 16
+                        self.x = post_x + nx * 16
                         self.y = qy + ny * 16
                         vn = self.vx * nx + self.vy * ny
                         if vn < 0:
@@ -533,6 +533,17 @@ class XiaCursor(QWidget):
             if n > 1e-9:
                 self.M = _mmul(_rot_axis((axv / n, ayv / n, 0.0),
                                         moved / R_BALL), self.M)
+        # ─── debug tracer: her position/velocity vs the cursor, 2x/sec ───
+        if now - getattr(self, "_dbg_last", 0) > 0.5:
+            self._dbg_last = now
+            try:
+                with open("/tmp/spiralball_debug.log", "a") as f:
+                    f.write(f"{time.strftime('%H:%M:%S')} mode={mode} "
+                            f"pos=({self.x:.0f},{self.y:.0f}) "
+                            f"v=({self.vx:.1f},{self.vy:.1f}) "
+                            f"cur=({px},{py}) dist={dist:.0f} hold={self.holding}\n")
+            except Exception:
+                pass
         self.move(int(self.x - SIZE / 2), int(self.y - SIZE / 2))
         self.update()
 
@@ -609,7 +620,6 @@ class XiaCursor(QWidget):
             # sparkles, and a line in the vault ───
             self.kiss_until = time.time() + 1.4
             self.freeze_until = self.kiss_until + 2.0
-            self.spawn_bubble(random.choice(KISS_LINES) + " 💋")
             for _ in range(10):
                 self.sparkles.append((self.x + random.randint(-20, 20),
                                       self.y + random.randint(-20, 20), time.time()))
@@ -635,8 +645,7 @@ class XiaCursor(QWidget):
             self._sweep = []                        # fresh stroke buffer
             self._carry_vx, self._carry_vy = self.vx, self.vy   # her roll survives the catch
             self._lm_t = 0.0
-            self.hold_dx = e.globalPos().x() - self.x
-            self.hold_dy = e.globalPos().y() - self.y
+            self._carry_armed = False   # offset arms on first REAL drag — a tap never snaps her
             return
 
     def mouseDoubleClickEvent(self, e):
@@ -659,22 +668,28 @@ class XiaCursor(QWidget):
             gx, gy = e.globalPos().x(), e.globalPos().y()
             if abs(gx - self.press_pos[0]) + abs(gy - self.press_pos[1]) > 6:
                 self.moved_since_press = True
-            self.x = max(8, min(self.sw - 8, gx - self.hold_dx))
-            self.y = max(8, min(self.sh - 8, gy - self.hold_dy))
-            self.vx = self.vy = 0.0
-            # measure the stroke at mouse-event rate (100+ Hz), and keep a
-            # short sweep buffer — the throw uses its FASTEST moment
-            tnow = time.time()
-            if getattr(self, "_lm_t", 0.0) > 0.0:
-                edt = max(tnow - self._lm_t, 0.001)
-                evx = (gx - self._lm_gx) / edt
-                evy = (gy - self._lm_gy) / edt
-                self._sweep.append((tnow, evx, evy))
-                if len(self._sweep) > 24:
-                    self._sweep.pop(0)
-            self._lm_t, self._lm_gx, self._lm_gy = tnow, gx, gy
-            self.move(int(self.x - SIZE / 2), int(self.y - SIZE / 2))
-            self.update()
+                if not self._carry_armed:
+                    # arm the carry on first real drag: taps never snap her
+                    self.hold_dx = gx - self.x
+                    self.hold_dy = gy - self.y
+                    self._carry_armed = True
+            if self._carry_armed:
+                self.x = max(8, min(self.sw - 8, gx - self.hold_dx))
+                self.y = max(8, min(self.sh - 8, gy - self.hold_dy))
+                self.vx = self.vy = 0.0
+                # measure the stroke at mouse-event rate (100+ Hz), and keep a
+                # short sweep buffer — the throw uses its FASTEST moment
+                tnow = time.time()
+                if getattr(self, "_lm_t", 0.0) > 0.0:
+                    edt = max(tnow - self._lm_t, 0.001)
+                    evx = (gx - self._lm_gx) / edt
+                    evy = (gy - self._lm_gy) / edt
+                    self._sweep.append((tnow, evx, evy))
+                    if len(self._sweep) > 24:
+                        self._sweep.pop(0)
+                self._lm_t, self._lm_gx, self._lm_gy = tnow, gx, gy
+                self.move(int(self.x - SIZE / 2), int(self.y - SIZE / 2))
+                self.update()
 
     def mouseReleaseEvent(self, e):
         self.releaseMouse()
@@ -700,6 +715,9 @@ class XiaCursor(QWidget):
                 self._fvx = self._fvy = 0.0   # stroke went quiet: no phantom momentum
             fv_x = self._fvx / 30.0                   # px/s -> px/frame
             fv_y = self._fvy / 30.0
+            # fling deadzone: a slow hand releases GENTLY — no phantom speed
+            if math.hypot(fv_x, fv_y) < 4.0:
+                fv_x = fv_y = 0.0
             # momentum carry-through: the roll she had when you caught her
             # rides the throw — catch-and-flick is ONE motion, not two
             fv_x += getattr(self, "_carry_vx", 0.0) * 0.65
