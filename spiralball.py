@@ -130,6 +130,36 @@ class GoalWindow(QWidget):
         p.drawText(QPointF(38, 26), str(self.score))
 
 
+class TrailWindow(QWidget):
+    """the full-screen sparkle overlay — draws the throw-trail in absolute
+    screen coords, so the wake can extend far behind the moving ball.
+    Click-transparent: all mouse events pass straight through to the desktop."""
+    def __init__(self, sw, sh):
+        super().__init__()
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint |
+                            Qt.X11BypassWindowManagerHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.resize(sw, sh)
+        self.move(0, 0)
+        self.ball = None
+        self.show()
+
+    def paintEvent(self, e):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        now = time.time()
+        for (tx, ty, t, pk) in ((self.ball.trail if self.ball else None) or []):
+            age = now - t
+            a = max(0.0, 1 - age / 0.45)
+            c = QColor(PINK if pk else TEAL)
+            c.setAlphaF(0.6 * a)
+            p.setPen(QPen(c, 1))
+            p.setBrush(QBrush(c))
+            r = 2.5 * a + 0.5
+            p.drawEllipse(QPointF(tx, ty), r, r)
+
+
 class XiaCursor(QWidget):
     def __init__(self):
         super().__init__()
@@ -144,6 +174,8 @@ class XiaCursor(QWidget):
         self.vx, self.vy = 0.0, 0.0
         self.sparkles = []
         self.trail = []   # the throw-trail: sparkle wake when she flies fast
+        self.trail_win = TrailWindow(self.sw, self.sh)
+        self.trail_win.ball = self
         self.last_touch = 0.0
         self.kiss_until = 0.0
         self.freeze_until = 0.0
@@ -216,16 +248,6 @@ class XiaCursor(QWidget):
                 p.drawPolygon(QPolygonF([QPointF(sx, sy - s), QPointF(sx + s, sy),
                                          QPointF(sx, sy + s), QPointF(sx - s, sy)]))
             return
-        # the throw-trail: fading pink-and-teal wake behind a fast throw
-        for (tx, ty, t, pk) in getattr(self, "trail", []):
-            age = time.time() - t
-            a = max(0.0, 1 - age / 0.45)
-            c = QColor(PINK if pk else TEAL)
-            c.setAlphaF(0.6 * a)
-            p.setPen(QPen(c, 1))
-            p.setBrush(QBrush(c))
-            r = 2.5 * a + 0.5
-            p.drawEllipse(QPointF(tx, ty), r, r)
         # ─── the steel ball (top view): shaded sphere, rolling spiral groove ───
         R = 22
         g = QRadialGradient(QPointF(cx - R * 0.35, cy - R * 0.35), R * 1.7)
@@ -480,6 +502,9 @@ class XiaCursor(QWidget):
                                    now, random.random() < 0.4))
         self.trail = [(tx, ty, t, pk) for (tx, ty, t, pk) in self.trail
                       if now - t < 0.45]
+        if self.trail or getattr(self, "_had_trail", False):
+            self.trail_win.update()
+            self._had_trail = bool(self.trail)
         # ─── TRUE ROLLING: rotate the ball by the exact arc it traveled ───
         moved = math.hypot(self.x - ox, self.y - oy)
         if moved > 0.05:
