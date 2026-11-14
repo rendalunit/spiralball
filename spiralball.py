@@ -290,7 +290,7 @@ class XiaCursor(QWidget):
             c = QColor()
             c.setHslF(th, ts, min(1.0, tl * max(0.25, light)), 1.0)
             # foreshortened stroke: real paint compresses near the rim
-            w = 9.5 * (0.42 + 0.58 * zdep)
+            w = 14.2 * (0.42 + 0.58 * zdep)
             p.setPen(QPen(c, w))
             p.drawLine(QPointF(cx + a[0] * R * 0.95, cy + a[1] * R * 0.95),
                        QPointF(cx + b[0] * R * 0.95, cy + b[1] * R * 0.95))
