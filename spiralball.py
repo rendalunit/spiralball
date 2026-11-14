@@ -683,6 +683,21 @@ class XiaCursor(QWidget):
 
 
 if __name__ == "__main__":
+    # ─── singleton guard: only ONE ball may exist. The systemd girl owns the
+    # lock; ghosts (KDE session-restore, stray launches) exit instantly. ───
+    lock_file = os.path.expanduser("~/.config/xia_cursor/ball.lock")
+    try:
+        with open(lock_file) as f:
+            old_pid = int((f.read() or "0").strip() or 0)
+        if old_pid and os.path.exists("/proc/%d" % old_pid):
+            sys.exit(0)   # the ball already lives — stay a ghost, dear
+    except (OSError, ValueError):
+        pass
+    try:
+        with open(lock_file, "w") as f:
+            f.write(str(os.getpid()))
+    except OSError:
+        pass
     app = QApplication(sys.argv)
     w = XiaCursor(); w.show()
     sys.exit(app.exec_())
