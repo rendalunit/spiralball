@@ -398,7 +398,7 @@ class XiaCursor(QWidget):
             if self.vy > 55: self.vy = 55
             self.vx *= pow(0.9995, tf); self.vy *= pow(0.999, tf)
             if self.y >= self.sh - 9:
-                self.vx *= pow(0.995, tf)
+                self.vx *= pow(0.985, tf)   # game felt: she rolls out, slows, stops mid-field
             if getattr(self, "goal_win", None) is None:
                 gx = random.randint(60, self.sw - 160)
                 gy = random.randint(int(self.sh * 0.35), self.sh - 60)
