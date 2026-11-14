@@ -259,7 +259,7 @@ class XiaCursor(QWidget):
         ld = math.hypot(lx, ly) or 1.0
         shadow = QColor(10, 12, 16, 150)
         p.setBrush(QBrush(shadow)); p.setPen(Qt.NoPen)
-        p.drawEllipse(QPointF(cx + (lx / ld) * 14, cy + (ly / ld) * 14), 24, 19)
+        p.drawEllipse(QPointF(cx + (lx / ld) * 14, cy + (ly / ld) * 14), 12, 10)
         # ─── the steel ball (top view): shaded sphere, rolling spiral groove ───
         R = 22
         g = QRadialGradient(QPointF(cx - R * 0.35, cy - R * 0.35), R * 1.7)
