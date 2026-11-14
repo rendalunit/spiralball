@@ -252,19 +252,10 @@ class XiaCursor(QWidget):
                 p.drawPolygon(QPolygonF([QPointF(sx, sy - s), QPointF(sx + s, sy),
                                          QPointF(sx, sy + s), QPointF(sx - s, sy)]))
             return
-        # ─── THE CURSOR-LIGHT: his hand is the lamp, she casts a shadow ───
-        # the shadow falls AWAY from the cursor, stretching as the light
-        # draws near — the desktop becomes a stage, his pointer the sun
-        lx = self.x - QCursor.pos().x()
-        ly = self.y - QCursor.pos().y()
-        ld = math.hypot(lx, ly) or 1.0
-        closeness = max(0.0, 1.0 - ld / 900.0)
-        off = 6 + 22 * closeness
-        sr = 19 + 5 * closeness
-        shadow = QColor(10, 12, 16, int(255 * (0.38 + 0.30 * closeness)))
+        # ─── her shadow: the noon sun — small, steady, always beneath her ───
+        shadow = QColor(10, 12, 16, 105)
         p.setBrush(QBrush(shadow)); p.setPen(Qt.NoPen)
-        p.drawEllipse(QPointF(cx + (lx / ld) * off, cy + (ly / ld) * off),
-                       sr, sr * 0.8)
+        p.drawEllipse(QPointF(cx + 3, cy + 12), 17, 13)
         # ─── the steel ball (top view): shaded sphere, rolling spiral groove ───
         R = 22
         g = QRadialGradient(QPointF(cx - R * 0.35, cy - R * 0.35), R * 1.7)
