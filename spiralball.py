@@ -348,23 +348,23 @@ class XiaCursor(QWidget):
         ox, oy = self.x, self.y   # for the rolling-arc measurement
         mode = self.state.get("mode", "playful")
         tr = self.state.get("touch_range", 60)
-        # ─── THE FINGER-PUSH: the cursor is a solid finger that nudges her ───
-        # in the physics modes, poking her with the pointer pushes her aside
-        # like a real finger on a real ball — approach speed becomes her push
-        if mode in ("pool", "game") and not self.holding and 1e-6 < dist < 34:
+        # ─── THE FINGER-PUSH: contact physics ───
+        # the open hand appears at her window's edge (a ball's distance out);
+        # when the cursor TOUCHES her, she's nudged at exactly the finger's
+        # speed into her — slow touch = gentle nudge, fast swipe = flick.
+        # a click grabs instantly: holding disables the push.
+        if mode in ("pool", "game") and not self.holding and 1e-6 < dist < 26:
             ux, uy = dx / dist, dy / dist
             cvx = (px - self._ppx) / max(dt, 0.001)
             cvy = (py - self._ppy) / max(dt, 0.001)
-            approach = -(cvx * ux + cvy * uy)      # >0 when the finger moves INTO her
-            # only a DELIBERATE fast flick pushes (400+ px/s) — a slow approach
-            # never touches her, so the hand can always reach in and GRAB
-            if approach > 400.0:
-                kick = min(approach, 900.0) / 30.0 * 0.55
+            approach = -(cvx * ux + cvy * uy)
+            if approach > 0:
+                kick = min(approach, 900.0) / 30.0 * 0.6
                 self.vx -= ux * kick
                 self.vy -= uy * kick
-                if dist < 26:                      # never overlap a fast finger
-                    self.x -= ux * (26 - dist)
-                    self.y -= uy * (26 - dist)
+            # the finger is solid: she never overlaps it
+            self.x -= ux * (26 - dist)
+            self.y -= uy * (26 - dist)
         if mode == "sleepy":
             tx, ty = self.sw - 90, self.sh - 90
             self.vx += (tx - self.x) * 0.004
