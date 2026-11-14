@@ -655,6 +655,20 @@ class XiaCursor(QWidget):
             self.spawn_bubble(line)
             return
         if e.button() == Qt.LeftButton:
+            # ─── SHIFT+CLICK = THE STRIKE: hit her from the hand zone, no grab.
+            # Power = how far your hand was when you struck — far = hard,
+            # close = soft. The hand cursor appears as you enter her range.
+            if e.modifiers() & Qt.ShiftModifier:
+                gx, gy = e.globalPos().x(), e.globalPos().y()
+                sdx, sdy = self.x - gx, self.y - gy
+                sd = math.hypot(sdx, sdy) or 1.0
+                power = min(sd / 56.0, 1.0) * 18.0   # window-range distance -> force
+                self.vx += (sdx / sd) * power
+                self.vy += (sdy / sd) * power
+                for _ in range(6):
+                    self.sparkles.append((self.x + random.randint(-14, 14),
+                                          self.y + random.randint(-14, 14), time.time()))
+                return
             # press: hold and drag = carry her (the kiss lives on middle-click now)
             self.press_time = time.time()
             self.press_pos = (e.globalPos().x(), e.globalPos().y())
