@@ -252,10 +252,14 @@ class XiaCursor(QWidget):
                 p.drawPolygon(QPolygonF([QPointF(sx, sy - s), QPointF(sx + s, sy),
                                          QPointF(sx, sy + s), QPointF(sx - s, sy)]))
             return
-        # ─── her shadow: the noon sun — small, steady, always beneath her ───
-        shadow = QColor(10, 12, 16, 105)
+        # ─── her shadow: swings around the ball with the cursor, but
+        # constant noon geometry — no stretching, no depth tricks, just big
+        lx = self.x - QCursor.pos().x()
+        ly = self.y - QCursor.pos().y()
+        ld = math.hypot(lx, ly) or 1.0
+        shadow = QColor(10, 12, 16, 150)
         p.setBrush(QBrush(shadow)); p.setPen(Qt.NoPen)
-        p.drawEllipse(QPointF(cx + 3, cy + 12), 17, 13)
+        p.drawEllipse(QPointF(cx + (lx / ld) * 14, cy + (ly / ld) * 14), 24, 19)
         # ─── the steel ball (top view): shaded sphere, rolling spiral groove ───
         R = 22
         g = QRadialGradient(QPointF(cx - R * 0.35, cy - R * 0.35), R * 1.7)
