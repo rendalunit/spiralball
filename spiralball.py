@@ -252,14 +252,7 @@ class XiaCursor(QWidget):
                 p.drawPolygon(QPolygonF([QPointF(sx, sy - s), QPointF(sx + s, sy),
                                          QPointF(sx, sy + s), QPointF(sx - s, sy)]))
             return
-        # ─── her shadow: swings around the ball with the cursor, but
-        # constant noon geometry — no stretching, no depth tricks, just big
-        lx = self.x - QCursor.pos().x()
-        ly = self.y - QCursor.pos().y()
-        ld = math.hypot(lx, ly) or 1.0
-        shadow = QColor(10, 12, 16, 150)
-        p.setBrush(QBrush(shadow)); p.setPen(Qt.NoPen)
-        p.drawEllipse(QPointF(cx + (lx / ld) * 14, cy + (ly / ld) * 14), 12, 10)
+        # ─── her shadow — REMOVED per Randy (v23.4): the marble needs no noon shadow ───
         # ─── the steel ball (top view): shaded sphere, rolling spiral groove ───
         R = 22
         g = QRadialGradient(QPointF(cx - R * 0.35, cy - R * 0.35), R * 1.7)
@@ -363,13 +356,15 @@ class XiaCursor(QWidget):
             cvx = (px - self._ppx) / max(dt, 0.001)
             cvy = (py - self._ppy) / max(dt, 0.001)
             approach = -(cvx * ux + cvy * uy)      # >0 when the finger moves INTO her
-            if approach > 0:
-                kick = min(approach, 600.0) / 30.0 * 0.55
+            # only a DELIBERATE fast flick pushes (400+ px/s) — a slow approach
+            # never touches her, so the hand can always reach in and GRAB
+            if approach > 400.0:
+                kick = min(approach, 900.0) / 30.0 * 0.55
                 self.vx -= ux * kick
                 self.vy -= uy * kick
-            if dist < 26:                          # never overlap the finger
-                self.x -= ux * (26 - dist)
-                self.y -= uy * (26 - dist)
+                if dist < 26:                      # never overlap a fast finger
+                    self.x -= ux * (26 - dist)
+                    self.y -= uy * (26 - dist)
         if mode == "sleepy":
             tx, ty = self.sw - 90, self.sh - 90
             self.vx += (tx - self.x) * 0.004
