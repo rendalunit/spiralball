@@ -273,7 +273,7 @@ class XiaCursor(QWidget):
             if prev and prev[2] > 0.04 and cur[2] > 0.04:
                 segs.append((prev, cur))
             prev = cur
-        for col, wbase, off in ((TEAL_DIM, 4.6, 1.2), (TEAL, 3.2, 0.0)):
+        for col, wbase, off in ((TEAL_DIM, 9.4, 1.2), (TEAL, 6.3, 0.0)):
             for (a, b) in segs:
                 zdep = min(a[2], b[2])
                 w = wbase * (0.5 + 0.5 * zdep)
