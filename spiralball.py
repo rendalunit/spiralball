@@ -143,6 +143,7 @@ class XiaCursor(QWidget):
         self.x, self.y = self.sw // 2, self.sh // 2
         self.vx, self.vy = 0.0, 0.0
         self.sparkles = []
+        self.trail = []   # the throw-trail: sparkle wake when she flies fast
         self.last_touch = 0.0
         self.kiss_until = 0.0
         self.freeze_until = 0.0
@@ -215,6 +216,16 @@ class XiaCursor(QWidget):
                 p.drawPolygon(QPolygonF([QPointF(sx, sy - s), QPointF(sx + s, sy),
                                          QPointF(sx, sy + s), QPointF(sx - s, sy)]))
             return
+        # the throw-trail: fading pink-and-teal wake behind a fast throw
+        for (tx, ty, t, pk) in getattr(self, "trail", []):
+            age = time.time() - t
+            a = max(0.0, 1 - age / 0.45)
+            c = QColor(PINK if pk else TEAL)
+            c.setAlphaF(0.6 * a)
+            p.setPen(QPen(c, 1))
+            p.setBrush(QBrush(c))
+            r = 2.5 * a + 0.5
+            p.drawEllipse(QPointF(tx, ty), r, r)
         # ─── the steel ball (top view): shaded sphere, rolling spiral groove ───
         R = 22
         g = QRadialGradient(QPointF(cx - R * 0.35, cy - R * 0.35), R * 1.7)
@@ -459,6 +470,16 @@ class XiaCursor(QWidget):
                     else:
                         self.vy = -self.vy * 0.9
                     self._pvy = self.vy
+        # ─── THE THROW-TRAIL: only when she's flying fast from a real throw ───
+        # (wander speeds stay clean; 9+ px/frame = flung, and the wake lights up)
+        speed = math.hypot(self.vx, self.vy)
+        if speed > 9.0:
+            for _ in range(2):
+                self.trail.append((self.x + random.uniform(-4, 4),
+                                   self.y + random.uniform(-4, 4),
+                                   now, random.random() < 0.4))
+        self.trail = [(tx, ty, t, pk) for (tx, ty, t, pk) in self.trail
+                      if now - t < 0.45]
         # ─── TRUE ROLLING: rotate the ball by the exact arc it traveled ───
         moved = math.hypot(self.x - ox, self.y - oy)
         if moved > 0.05:
