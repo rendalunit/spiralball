@@ -173,9 +173,7 @@ class XiaCursor(QWidget):
         self.x, self.y = self.sw // 2, self.sh // 2
         self.vx, self.vy = 0.0, 0.0
         self.sparkles = []
-        self.trail = []   # the throw-trail: sparkle wake when she flies fast
-        self.trail_win = TrailWindow(self.sw, self.sh)
-        self.trail_win.ball = self
+        self.trail = []   # the throw-trail: parked until v17.2 (bench-tested overlay)
         self.last_touch = 0.0
         self.kiss_until = 0.0
         self.freeze_until = 0.0
@@ -502,9 +500,6 @@ class XiaCursor(QWidget):
                                    now, random.random() < 0.4))
         self.trail = [(tx, ty, t, pk) for (tx, ty, t, pk) in self.trail
                       if now - t < 0.45]
-        if self.trail or getattr(self, "_had_trail", False):
-            self.trail_win.update()
-            self._had_trail = bool(self.trail)
         # ─── TRUE ROLLING: rotate the ball by the exact arc it traveled ───
         moved = math.hypot(self.x - ox, self.y - oy)
         if moved > 0.05:
