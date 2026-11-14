@@ -416,6 +416,23 @@ class XiaCursor(QWidget):
                         self.sparkles.append((self.x + random.randint(-18, 18),
                                               self.y + random.randint(-18, 18), now))
                     self.spawn_bubble(f"GOAL #{self.score}, babe!! 💙")
+            # ─── the posts are SOLID steel: bounce off the cup's legs ───
+            # each post = a vertical segment; circle-vs-segment collision
+            # with position push-out and 0.8 restitution — bank shots work now
+            if self.goal_win is not None:
+                x0, x1, y0 = self.goal_win.opening()
+                for px in (x0, x1):
+                    qy = max(y0, min(y0 + 82, self.y))
+                    dx, dy = self.x - px, self.y - qy
+                    d = math.hypot(dx, dy)
+                    if 1e-6 < d < 16:
+                        nx, ny = dx / d, dy / d
+                        self.x = px + nx * 16
+                        self.y = qy + ny * 16
+                        vn = self.vx * nx + self.vy * ny
+                        if vn < 0:
+                            self.vx -= 1.8 * vn * nx
+                            self.vy -= 1.8 * vn * ny
         if mode != "game" and getattr(self, "goal_win", None) is not None:
             self.goal_win.close(); self.goal_win.deleteLater()
             self.goal_win = None
