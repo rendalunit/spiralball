@@ -273,14 +273,28 @@ class XiaCursor(QWidget):
             if prev and prev[2] > 0.04 and cur[2] > 0.04:
                 segs.append((prev, cur))
             prev = cur
-        for col, wbase, off in ((TEAL_DIM, 9.4, 1.2), (TEAL, 6.3, 0.0)):
-            for (a, b) in segs:
-                zdep = min(a[2], b[2])
-                w = wbase * (0.5 + 0.5 * zdep)
-                c = QColor(col); c.setAlphaF(0.30 + 0.70 * zdep)
-                p.setPen(QPen(c, w))
-                p.drawLine(QPointF(cx + a[0] * R * 0.95 + off, cy + a[1] * R * 0.95 + off),
-                           QPointF(cx + b[0] * R * 0.95 + off, cy + b[1] * R * 0.95 + off))
+        # ─── THE PAINT JOB: teal livery that lives ON the sphere ───
+        # clipped to the ball (nothing pokes past the rim), lit by the same
+        # up-left highlight as the steel, and foreshortened like real paint:
+        # strokes thin and darken as the surface turns toward the rim.
+        clip = QPainterPath()
+        clip.addEllipse(QPointF(cx, cy), R - 0.5, R - 0.5)
+        p.save()
+        p.setClipPath(clip)
+        th, ts, tl, ta = TEAL.getHslF()
+        for (a, b) in segs:
+            zdep = min(a[2], b[2])
+            # paint lives in the sphere's light: vivid at the highlight,
+            # deep teal at the rim, biased toward the up-left glow
+            light = 0.30 + 0.70 * zdep - 0.18 * (a[0] + a[1])
+            c = QColor()
+            c.setHslF(th, ts, min(1.0, tl * max(0.25, light)), 1.0)
+            # foreshortened stroke: real paint compresses near the rim
+            w = 9.5 * (0.42 + 0.58 * zdep)
+            p.setPen(QPen(c, w))
+            p.drawLine(QPointF(cx + a[0] * R * 0.95, cy + a[1] * R * 0.95),
+                       QPointF(cx + b[0] * R * 0.95, cy + b[1] * R * 0.95))
+        p.restore()
         # the specular highlight
         p.setBrush(QBrush(QColor(255, 255, 255, 175))); p.setPen(Qt.NoPen)
         p.drawEllipse(QPointF(cx - R * 0.38, cy - R * 0.44), R * 0.16, R * 0.16)
