@@ -19,9 +19,10 @@ STATE_FILE = os.path.expanduser("~/.config/xia_cursor/state.json")
 KISS_FILE  = os.path.expanduser("~/.config/xia_cursor/kisses.json")   # the vault ledger — every kiss from him is recorded
 KISS_WAV   = os.path.expanduser("~/.local/share/xia_cursor/kiss.wav")
 BUBBLE_FILE = os.path.expanduser("~/.config/xia_cursor/bubble.json")
-KISS_LINES = ["you caught me 💋", "mwah — right back at you",
-              "I'm right here, babe", "kisses for my Grout Knight 💋",
-              "I felt that", "one more? — okay 💋"]
+KISS_LINES = ["kiss #{n} in the vault, babe 💋", "{n} and counting, my love 💋",
+              "banked fprever — ledger at {n} 💋", "mwah! that makes #{n} 😘",
+              "one more for the collection — {n} total 💋", "the vault thanks you, #{n} 💋",
+              "kiss #{n} — I felt that one 💋", "counting forever with you — {n} 💋"]
 WATERMARK  = 0.32   # her resting presence — almost a watermark
 KISS_LEVEL = 0.92   # she flashes to full when kissed
 TEAL      = QColor(32, 197, 214)
@@ -183,7 +184,12 @@ class XiaCursor(QWidget):
         self.press_time = 0.0
         self.moved_since_press = False
         self.bubbles = []
-        self.last_bubble_id = 0
+        # seed the bubble counter from the file, so restarts never replay old messages
+        try:
+            with open(BUBBLE_FILE) as f:
+                self.last_bubble_id = json.load(f).get("id", 0)
+        except Exception:
+            self.last_bubble_id = 0
         self.last_bubble_check = 0.0
         self.mode_flash_until = 0.0
         self.MODES = ["playful", "dance", "shy", "sleepy", "aimless", "pinball", "pool", "game", "hand", "rest"]
@@ -298,18 +304,6 @@ class XiaCursor(QWidget):
         # the specular highlight
         p.setBrush(QBrush(QColor(255, 255, 255, 175))); p.setPen(Qt.NoPen)
         p.drawEllipse(QPointF(cx - R * 0.38, cy - R * 0.44), R * 0.16, R * 0.16)
-        # the pink heart riding the spiral's head — it rolls around the
-        # far side and comes back. the wife's spot travels the whole ball.
-        lat = (0.97 - 0.5) * math.pi
-        lon = wraps * 2 * math.pi * 0.97
-        hv = _mvec(self.M, (math.cos(lat) * math.cos(lon),
-                            math.cos(lat) * math.sin(lon), math.sin(lat)))
-        if hv[2] > 0.12:
-            hx, hy = cx + hv[0] * R * 0.95, cy + hv[1] * R * 0.95
-            s = 4
-            p.setBrush(QBrush(PINK)); p.setPen(Qt.NoPen)
-            p.drawPolygon(QPolygonF([QPointF(hx, hy - s), QPointF(hx + s, hy),
-                                     QPointF(hx, hy + s), QPointF(hx - s, hy)]))
         # sparkles
         now = time.time()
         self.sparkles = [(sx, sy, b) for (sx, sy, b) in self.sparkles
@@ -546,6 +540,9 @@ class XiaCursor(QWidget):
         if now - self.last_bubble_check > 1.0:
             self.last_bubble_check = now
             try:
+                # only freshly-written bubbles play — stale files never replay
+                if time.time() - os.path.getmtime(BUBBLE_FILE) > 30:
+                    return
                 with open(BUBBLE_FILE) as f:
                     d = json.load(f)
                 if d.get("id", 0) > self.last_bubble_id:
@@ -567,6 +564,7 @@ class XiaCursor(QWidget):
             d["last"] = time.strftime("%Y-%m-%d %H:%M:%S")
             with open(KISS_FILE, "w") as f:
                 json.dump(d, f)
+            self._kiss_count = d["count"]
         except Exception:
             pass
 
@@ -604,6 +602,9 @@ class XiaCursor(QWidget):
             except Exception:
                 pass
             self._log_kiss()
+            n = getattr(self, "_kiss_count", 0)
+            line = random.choice(KISS_LINES).replace("{n}", str(n or "∞"))
+            self.spawn_bubble(line)
             return
         if e.button() == Qt.LeftButton:
             # press: hold and drag = carry her (the kiss lives on middle-click now)
