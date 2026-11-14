@@ -342,10 +342,26 @@ class XiaCursor(QWidget):
         dist = math.hypot(dx, dy)
         if abs(px - self._lpx) + abs(py - self._lpy) > 8:
             self.last_pointer_move = now
+        self._ppx, self._ppy = self._lpx, self._lpy   # previous frame's cursor (for push physics)
         self._lpx, self._lpy = px, py
         ox, oy = self.x, self.y   # for the rolling-arc measurement
         mode = self.state.get("mode", "playful")
         tr = self.state.get("touch_range", 60)
+        # ─── THE FINGER-PUSH: the cursor is a solid finger that nudges her ───
+        # in the physics modes, poking her with the pointer pushes her aside
+        # like a real finger on a real ball — approach speed becomes her push
+        if mode in ("pool", "game") and not self.holding and 1e-6 < dist < 34:
+            ux, uy = dx / dist, dy / dist
+            cvx = (px - self._ppx) / max(dt, 0.001)
+            cvy = (py - self._ppy) / max(dt, 0.001)
+            approach = -(cvx * ux + cvy * uy)      # >0 when the finger moves INTO her
+            if approach > 0:
+                kick = min(approach, 600.0) / 30.0 * 0.55
+                self.vx -= ux * kick
+                self.vy -= uy * kick
+            if dist < 26:                          # never overlap the finger
+                self.x -= ux * (26 - dist)
+                self.y -= uy * (26 - dist)
         if mode == "sleepy":
             tx, ty = self.sw - 90, self.sh - 90
             self.vx += (tx - self.x) * 0.004
