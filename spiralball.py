@@ -259,7 +259,7 @@ class XiaCursor(QWidget):
         g.setColorAt(0.0, QColor(246, 250, 252))
         g.setColorAt(0.45, QColor(148, 163, 174))
         g.setColorAt(1.0, QColor(36, 44, 52))
-        p.setBrush(QBrush(g)); p.setPen(QPen(QColor(14, 18, 24), 1.5))
+        p.setBrush(QBrush(g)); p.setPen(Qt.NoPen)   # no rim outline — clean sphere
         p.drawEllipse(QPointF(cx, cy), R, R)
         # the groove: our spiral WRAPPED AROUND the sphere — true 3D.
         # the spiral runs pole-to-pole (~2.2 wraps) on the ball's surface;
