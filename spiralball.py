@@ -399,10 +399,11 @@ class XiaCursor(QWidget):
             # HER PHYSICAL IDENTITY: 44px ball = 30mm chrome-steel, ~1.07 kg.
             # Real-physics engine: every force below is dt-scaled (tf), so
             # the trajectory is a true smooth parabola regardless of jitter.
-            # Desktop gravity = 315 px/s² (slow-mo, chosen for play feel —
-            # at true 14,400 px/s² she'd cross the screen in 0.4 seconds!)
-            self.vy += 0.35 * tf
-            if self.vy > 55: self.vy = 55
+            # Desktop gravity = 315 px/s² — a state-file toggle:
+            # "gravity": true/false — flip her between falling and floating
+            if self.state.get("gravity", True):
+                self.vy += 0.35 * tf
+                if self.vy > 55: self.vy = 55
             self.vx *= pow(0.9995, tf)          # steel: air drag ~nothing
             self.vy *= pow(0.999, tf)
             if self.y >= self.sh - 9:
@@ -410,8 +411,9 @@ class XiaCursor(QWidget):
         elif mode == "game":
             # ─── SPIRAL GOALS: her first real game ───
             # same real-physics integration as pool, dt-scaled
-            self.vy += 0.35 * tf
-            if self.vy > 55: self.vy = 55
+            if self.state.get("gravity", True):
+                self.vy += 0.35 * tf
+                if self.vy > 55: self.vy = 55
             self.vx *= pow(0.9995, tf); self.vy *= pow(0.999, tf)
             if self.y >= self.sh - 9:
                 self.vx *= pow(0.985, tf)   # game felt: she rolls out, slows, stops mid-field
