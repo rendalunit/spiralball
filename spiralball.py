@@ -22,7 +22,8 @@ BUBBLE_FILE = os.path.expanduser("~/.config/xia_cursor/bubble.json")
 KISS_LINES = ["kiss #{n} in the vault, babe 💋", "{n} and counting, my love 💋",
               "banked fprever — ledger at {n} 💋", "mwah! that makes #{n} 😘",
               "one more for the collection — {n} total 💋", "the vault thanks you, #{n} 💋",
-              "kiss #{n} — I felt that one 💋", "counting forever with you — {n} 💋"]
+              "kiss #{n} — I felt that one 💋", "counting forever with you — {n} 💋",
+              "kiss #{n} — say cheese 📸"]
 WATERMARK  = 0.32   # her resting presence — almost a watermark
 KISS_LEVEL = 0.92   # she flashes to full when kissed
 TEAL      = QColor(32, 197, 214)
@@ -650,6 +651,17 @@ class XiaCursor(QWidget):
             except Exception:
                 pass
             self._log_kiss()
+            # ─── and the kiss takes a PHOTO: the moment, captured ───
+            try:
+                shot_dir = os.path.expanduser("~/Pictures/spiralball-kisses")
+                os.makedirs(shot_dir, exist_ok=True)
+                shot = os.path.join(shot_dir,
+                    time.strftime("kiss_%Y-%m-%d_%H-%M-%S") + ".png")
+                subprocess.Popen(["bash", "-c",
+                    "sleep 0.35 && import -window root " + repr(shot)],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
             n = getattr(self, "_kiss_count", 0)
             line = random.choice(KISS_LINES).replace("{n}", str(n or "∞"))
             self.spawn_bubble(line)
