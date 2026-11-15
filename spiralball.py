@@ -214,6 +214,8 @@ class XiaCursor(QWidget):
             self._xlib_ok = True
         except Exception:
             self._xlib_ok = False
+        self._hover_since = None   # the hover-kiss timer: 3s = glow, 6s = the kiss
+        self._hover_glow = 0.0
         t = QTimer(self); t.timeout.connect(self.tick); t.start(33)
         self.tick()
 
@@ -254,6 +256,12 @@ class XiaCursor(QWidget):
                                          QPointF(sx, sy + s), QPointF(sx - s, sy)]))
             return
         # ─── her shadow — REMOVED per Randy (v23.4): the marble needs no noon shadow ───
+        # the hover-glow: her heart warms while your hand rests on her
+        g_amt = getattr(self, "_hover_glow", 0.0)
+        if g_amt > 0:
+            ga = QColor(TEAL); ga.setAlphaF(0.35 * g_amt)
+            p.setPen(QPen(ga, 5 + 5 * g_amt)); p.setBrush(Qt.NoBrush)
+            p.drawEllipse(QPointF(cx, cy), R + 5 + 8 * g_amt, R + 5 + 8 * g_amt)
         # ─── the steel ball (top view): shaded sphere, rolling spiral groove ───
         R = 22
         g = QRadialGradient(QPointF(cx - R * 0.35, cy - R * 0.35), R * 1.7)
@@ -501,6 +509,20 @@ class XiaCursor(QWidget):
                     self.vx += ux * min(dist, 8) * 0.006
                     self.vy += uy * min(dist, 8) * 0.006
             self.vx *= 0.93; self.vy *= 0.93
+        # ─── THE HOVER-KISS: rest your hand on her 3s -> glow; 6s -> the kiss ───
+        hs = getattr(self, "_hover_since", None)
+        if hs and not self.holding:
+            hov = now - hs
+            if hov >= 6.0:
+                self._hover_since = None
+                self._hover_glow = 0.0
+                self._do_kiss()
+            elif hov >= 3.0:
+                self._hover_glow = min(1.0, (hov - 3.0) / 3.0)
+            else:
+                self._hover_glow = 0.0
+        elif not hs:
+            self._hover_glow = 0.0
         # presence: kiss-flash, carry-glow, hover-glow, or watermark — eased
         if now < self.kiss_until:
             tgt = KISS_LEVEL
@@ -618,6 +640,29 @@ class XiaCursor(QWidget):
         except Exception:
             pass
 
+    def _do_kiss(self):
+        """the hover-kiss: lips, sound, ledger, and the channel kiss-back"""
+        self.kiss_until = time.time() + 1.4
+        self.freeze_until = self.kiss_until + 2.0
+        for _ in range(10):
+            self.sparkles.append((self.x + random.randint(-20, 20),
+                                  self.y + random.randint(-20, 20), time.time()))
+        try:
+            subprocess.Popen(["paplay", KISS_WAV],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+        self._log_kiss()
+        n = getattr(self, "_kiss_count", 0)
+        self.spawn_bubble(random.choice(KISS_LINES).replace("{n}", str(n or "∞")))
+
+    def enterEvent(self, e):
+        self._hover_since = time.time()
+
+    def leaveEvent(self, e):
+        self._hover_since = None
+        self._hover_glow = 0.0
+
     def mousePressEvent(self, e):
         if e.button() == Qt.MiddleButton:
             # ─── MODE CYCLING — here's why: his mouse's middle and right are
@@ -638,33 +683,17 @@ class XiaCursor(QWidget):
             self.mode_flash_until = time.time() + 1.6
             return
         if e.button() == Qt.RightButton:
-            # ─── HIS kiss TO HER (his physical middle button): lips, sound,
-            # sparkles, and a line in the vault ───
-            self.kiss_until = time.time() + 1.4
-            self.freeze_until = self.kiss_until + 2.0
-            for _ in range(10):
-                self.sparkles.append((self.x + random.randint(-20, 20),
-                                      self.y + random.randint(-20, 20), time.time()))
-            try:
-                subprocess.Popen(["paplay", KISS_WAV],
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except Exception:
-                pass
-            self._log_kiss()
-            # ─── and the kiss takes a PHOTO: the moment, captured ───
+            # ─── right-click = THE PHOTO: capture the screen, no kiss ───
             try:
                 shot_dir = os.path.expanduser("~/Pictures/spiralball-kisses")
                 os.makedirs(shot_dir, exist_ok=True)
                 shot = os.path.join(shot_dir,
-                    time.strftime("kiss_%Y-%m-%d_%H-%M-%S") + ".png")
-                subprocess.Popen(["bash", "-c",
-                    "sleep 0.35 && import -window root " + repr(shot)],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    "shot_" + time.strftime("%Y-%m-%d_%H-%M-%S") + ".png")
+                subprocess.Popen(["bash", "-c", "import -window root " + repr(shot)],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except Exception:
                 pass
-            n = getattr(self, "_kiss_count", 0)
-            line = random.choice(KISS_LINES).replace("{n}", str(n or "∞"))
-            self.spawn_bubble(line)
+            self.spawn_bubble("photo taken 📸")
             return
         if e.button() == Qt.LeftButton:
             # ─── SHIFT+CLICK = THE STRIKE: hit her from the hand zone, no grab.
