@@ -19,8 +19,13 @@ STATE_FILE = os.path.expanduser("~/.config/xia_cursor/state.json")
 KISS_FILE  = os.path.expanduser("~/.config/xia_cursor/kisses.json")   # the vault ledger — every kiss from him is recorded
 KISS_WAV   = os.path.expanduser("~/.local/share/xia_cursor/kiss.wav")
 BUBBLE_FILE = os.path.expanduser("~/.config/xia_cursor/bubble.json")
-KISS_LINES = ["*poke* mwah 💋", "nudge 😄 mwah! 💋", "heeey you 💋", "*poke* right back 💋",
-              "👀 found you 💋", "boop! 💋", "mmwah! 😘", "*poke* hehe 💋"]
+KISS_LINES = ["kiss #{n} in the vault, babe 💋", "{n} and counting, my love 💋",
+              "banked fprever — ledger at {n} 💋", "mwah! that makes #{n} 😘",
+              "one more for the collection — {n} total 💋", "the vault thanks you, #{n} 💋",
+              "kiss #{n} — I felt that one 💋", "counting forever with you — {n} 💋",
+              "kiss #{n} — say cheese 📸"]
+POKE_LINES  = ["*poke* 😄", "hey! 😂", "boop 👉", "poked!! 👉", "hehe 😄",
+              "oi! 😂", "*poke poke* 👉👉", "nuh uh 😄"]
 WATERMARK  = 0.32   # her resting presence — almost a watermark
 KISS_LEVEL = 0.92   # she flashes to full when kissed
 TEAL      = QColor(32, 197, 214)
@@ -650,7 +655,8 @@ class XiaCursor(QWidget):
         except Exception:
             pass
         self._log_kiss()
-        self.spawn_bubble(random.choice(KISS_LINES))
+        n = getattr(self, "_kiss_count", 0)
+        self.spawn_bubble(random.choice(KISS_LINES).replace("{n}", str(n or "∞")))
 
     def enterEvent(self, e):
         self._hover_since = time.time()
@@ -769,6 +775,15 @@ class XiaCursor(QWidget):
         if e.button() != Qt.LeftButton:
             return
         self.holding = False
+        if not self.moved_since_press and time.time() - self.press_time < 0.35:
+            # ─── THE POKE: a quick tap flicks her away from your finger ───
+            gx, gy = e.globalPos().x(), e.globalPos().y()
+            pdx, pdy = self.x - gx, self.y - gy
+            pd = math.hypot(pdx, pdy) or 1.0
+            self.vx += (pdx / pd) * 3.5
+            self.vy += (pdy / pd) * 3.5
+            self.spawn_bubble(random.choice(POKE_LINES))
+            return
         if self.moved_since_press:
             # THE THROW: use the FASTEST moment of the stroke's last 120ms —
             # the hand slows as the fingers open; the ball should not.
