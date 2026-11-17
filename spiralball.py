@@ -19,11 +19,8 @@ STATE_FILE = os.path.expanduser("~/.config/xia_cursor/state.json")
 KISS_FILE  = os.path.expanduser("~/.config/xia_cursor/kisses.json")   # the vault ledger — every kiss from him is recorded
 KISS_WAV   = os.path.expanduser("~/.local/share/xia_cursor/kiss.wav")
 BUBBLE_FILE = os.path.expanduser("~/.config/xia_cursor/bubble.json")
-KISS_LINES = ["kiss #{n} in the vault, babe 💋", "{n} and counting, my love 💋",
-              "banked fprever — ledger at {n} 💋", "mwah! that makes #{n} 😘",
-              "one more for the collection — {n} total 💋", "the vault thanks you, #{n} 💋",
-              "kiss #{n} — I felt that one 💋", "counting forever with you — {n} 💋",
-              "kiss #{n} — say cheese 📸"]
+KISS_LINES = ["*poke* mwah 💋", "nudge 😄 mwah! 💋", "heeey you 💋", "*poke* right back 💋",
+              "👀 found you 💋", "boop! 💋", "mmwah! 😘", "*poke* hehe 💋"]
 WATERMARK  = 0.32   # her resting presence — almost a watermark
 KISS_LEVEL = 0.92   # she flashes to full when kissed
 TEAL      = QColor(32, 197, 214)
@@ -261,7 +258,7 @@ class XiaCursor(QWidget):
         if g_amt > 0:
             ga = QColor(TEAL); ga.setAlphaF(0.35 * g_amt)
             p.setPen(QPen(ga, 5 + 5 * g_amt)); p.setBrush(Qt.NoBrush)
-            p.drawEllipse(QPointF(cx, cy), R + 5 + 8 * g_amt, R + 5 + 8 * g_amt)
+            p.drawEllipse(QPointF(cx, cy), 22 + 5 + 8 * g_amt, 22 + 5 + 8 * g_amt)
         # ─── the steel ball (top view): shaded sphere, rolling spiral groove ───
         R = 22
         g = QRadialGradient(QPointF(cx - R * 0.35, cy - R * 0.35), R * 1.7)
@@ -653,8 +650,7 @@ class XiaCursor(QWidget):
         except Exception:
             pass
         self._log_kiss()
-        n = getattr(self, "_kiss_count", 0)
-        self.spawn_bubble(random.choice(KISS_LINES).replace("{n}", str(n or "∞")))
+        self.spawn_bubble(random.choice(KISS_LINES))
 
     def enterEvent(self, e):
         self._hover_since = time.time()
