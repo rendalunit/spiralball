@@ -691,7 +691,13 @@ class XiaCursor(QWidget):
                 os.makedirs(shot_dir, exist_ok=True)
                 shot = os.path.join(shot_dir,
                     "shot_" + time.strftime("%Y-%m-%d_%H-%M-%S") + ".png")
-                subprocess.Popen(["bash", "-c", "import -window root " + repr(shot)],
+                # ─── GHOST MODE: the ball vanishes for her own picture ───
+                if self.state.get("ghost_shot", True):
+                    self.hide()
+                    QTimer.singleShot(2000, self.show)   # re-appear after the capture
+                    QTimer.singleShot(2300, lambda: self.spawn_bubble("photo taken 📸"))
+                    return
+                subprocess.Popen(["bash", "-c", "sleep 0.6 && import -window root " + repr(shot)],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except Exception:
                 pass
